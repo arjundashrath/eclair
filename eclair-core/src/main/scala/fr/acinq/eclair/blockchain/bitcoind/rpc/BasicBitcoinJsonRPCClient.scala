@@ -16,7 +16,7 @@
 
 package fr.acinq.eclair.blockchain.bitcoind.rpc
 
-import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoinscala.ByteVector32
 import fr.acinq.eclair.KamonExt
 import fr.acinq.eclair.blockchain.Monitoring.{Metrics, Tags}
 import org.json4s.JsonAST.{JString, JValue}
@@ -41,7 +41,13 @@ class BasicBitcoinJsonRPCClient(rpcAuthMethod: BitcoinJsonRPCAuthMethod, host: S
     case x: ByteVector32 => JString(x.toHex)
   }))
 
-  implicit val formats = DefaultFormats.withBigDecimal + ByteVector32Serializer
+  object ByteVector32KmpSerializer extends CustomSerializer[fr.acinq.bitcoin.ByteVector32](_ => ( {
+    null
+  }, {
+    case x: fr.acinq.bitcoin.ByteVector32 => JString(x.toHex)
+  }))
+
+  implicit val formats = DefaultFormats.withBigDecimal + ByteVector32Serializer + ByteVector32KmpSerializer
   private val scheme = if (ssl) "https" else "http"
   private val serviceUri = wallet match {
     case Some(name) => uri"$scheme://$host:$port/wallet/$name"

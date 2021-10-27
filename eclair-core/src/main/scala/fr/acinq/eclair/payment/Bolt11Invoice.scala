@@ -16,8 +16,9 @@
 
 package fr.acinq.eclair.payment
 
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import fr.acinq.bitcoin.{Base58, Base58Check, Bech32, Block, ByteVector32, ByteVector64, Crypto}
+import fr.acinq.bitcoinscala.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoinscala.{Block, ByteVector32, ByteVector64, Crypto}
+import fr.acinq.bitcoin.{Base58, Base58Check, Bech32}
 import fr.acinq.eclair.{CltvExpiryDelta, FeatureScope, FeatureSupport, Features, InvoiceFeature, MilliSatoshi, MilliSatoshiLong, ShortChannelId, TimestampSecond, randomBytes32}
 import scodec.bits.{BitVector, ByteOrdering, ByteVector}
 import scodec.codecs.{list, ubyte}
@@ -128,7 +129,7 @@ case class Bolt11Invoice(prefix: String, amount_opt: Option[MilliSatoshi], creat
     val hrp = s"${prefix}$hramount"
     val data = Codecs.bolt11DataCodec.encode(Bolt11Data(createdAt, tags, signature)).require
     val int5s = eight2fiveCodec.decode(data).require.value
-    Bech32.encode(hrp, int5s.toArray)
+    Bech32.encode(hrp, int5s.toArray, Bech32.Encoding.Bech32)
   }
 }
 
@@ -268,7 +269,10 @@ object Bolt11Invoice {
     }
 
     def fromBase58Address(address: String): FallbackAddress = {
-      val (prefix, hash) = Base58Check.decode(address)
+      val (prefix, hash) = {
+        val decoded = Base58Check.decode(address)
+        (decoded.getFirst.byteValue(), ByteVector.view(decoded.getSecond))
+      }
       prefix match {
         case Base58.Prefix.PubkeyAddress => FallbackAddress(17.toByte, hash)
         case Base58.Prefix.PubkeyAddressTestnet => FallbackAddress(17.toByte, hash)
@@ -278,20 +282,23 @@ object Bolt11Invoice {
     }
 
     def fromBech32Address(address: String): FallbackAddress = {
-      val (_, version, hash) = Bech32.decodeWitnessAddress(address)
+      val (_, version, hash) = {
+        val decoded = Bech32.decodeWitnessAddress(address)
+        (decoded.getFirst, decoded.getSecond, ByteVector.view(decoded.getThird))
+      }
       FallbackAddress(version, hash)
     }
 
     def toAddress(f: FallbackAddress, prefix: String): String = {
       import f.data
       f.version match {
-        case 17 if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.PubkeyAddress, data)
-        case 18 if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.ScriptAddress, data)
-        case 17 if prefix == "lntb" || prefix == "lnbcrt" => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, data)
-        case 18 if prefix == "lntb" || prefix == "lnbcrt" => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, data)
-        case version if prefix == "lnbc" => Bech32.encodeWitnessAddress("bc", version, data)
-        case version if prefix == "lntb" => Bech32.encodeWitnessAddress("tb", version, data)
-        case version if prefix == "lnbcrt" => Bech32.encodeWitnessAddress("bcrt", version, data)
+        case 17 if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.PubkeyAddress, data.toArray)
+        case 18 if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.ScriptAddress, data.toArray)
+        case 17 if prefix == "lntb" || prefix == "lnbcrt" => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, data.toArray)
+        case 18 if prefix == "lntb" || prefix == "lnbcrt" => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, data.toArray)
+        case version if prefix == "lnbc" => Bech32.encodeWitnessAddress("bc", version, data.toArray)
+        case version if prefix == "lntb" => Bech32.encodeWitnessAddress("tb", version, data.toArray)
+        case version if prefix == "lnbcrt" => Bech32.encodeWitnessAddress("bcrt", version, data.toArray)
       }
     }
   }
