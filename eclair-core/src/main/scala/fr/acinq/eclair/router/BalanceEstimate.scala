@@ -162,9 +162,12 @@ case class BalancesEstimates(balances: Map[(PublicKey, PublicKey), BalanceEstima
 }
 
 object BalancesEstimates {
-  def baseline(graph: DirectedGraph, defaultHalfLife: FiniteDuration): BalancesEstimates = BalancesEstimates((
-    for (edge <- graph.edgeSet() if edge.balance_opt.isEmpty)
-      yield (if (LexicographicalOrdering.isLessThan(edge.desc.a.value, edge.desc.b.value)) (edge.desc.a, edge.desc.b) else (edge.desc.b, edge.desc.a)) -> BalanceEstimate.baseline(edge.capacity, defaultHalfLife)
-    ).toMap,
+  def baseline(graph: DirectedGraph, defaultHalfLife: FiniteDuration): BalancesEstimates = BalancesEstimates(
+    graph.edgeSet().foldLeft[Map[(PublicKey, PublicKey), BalanceEstimate]](Map.empty) {
+      case (m, edge) => m.updatedWith(if (LexicographicalOrdering.isLessThan(edge.desc.a.value, edge.desc.b.value)) (edge.desc.a, edge.desc.b) else (edge.desc.b, edge.desc.a)) {
+        case None => Some(BalanceEstimate.baseline(edge.capacity, defaultHalfLife))
+        case Some(balance) => Some(balance.addChannel(edge.capacity))
+      }
+    },
     defaultHalfLife)
 }
