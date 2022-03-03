@@ -90,6 +90,8 @@ object IncomingPaymentPacket {
             case Failure(_) => Left(InvalidOnionPayload(UInt64(10), 0))
             case Success((decrypted, _)) => RouteBlindingEncryptedDataCodecs.encryptedDataCodec.decode(decrypted.bits) match {
               case Attempt.Successful(DecodeResult(relayNext, _)) =>
+                // TODO: If we build routes with several copies of our node at the end to hide the true length of the
+                // route, then we should add some code here to continue decrypting onions until we reach the final packet.
                 relayNext.get[RouteBlindingEncryptedDataTlv.OutgoingChannelId] match {
                   case Some(RouteBlindingEncryptedDataTlv.OutgoingChannelId(_)) =>
                     Right(ChannelRelayPacket(add, PaymentOnion.ChannelRelayTlvPayload(payload.records, Some(relayNext)), next))

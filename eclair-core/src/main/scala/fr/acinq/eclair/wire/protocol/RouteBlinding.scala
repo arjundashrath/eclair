@@ -18,7 +18,8 @@ package fr.acinq.eclair.wire.protocol
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.eclair.crypto.Sphinx
-import fr.acinq.eclair.{ShortChannelId, UInt64}
+import fr.acinq.eclair.wire.protocol.TlvCodecs.{ltmillisatoshi, ltu32}
+import fr.acinq.eclair.{CltvExpiry, MilliSatoshi, ShortChannelId, UInt64}
 import scodec.bits.ByteVector
 
 import scala.util.Try
@@ -51,6 +52,11 @@ object RouteBlindingEncryptedDataTlv {
   /** Blinding override for the rest of the route. */
   case class NextBlinding(blinding: PublicKey) extends RouteBlindingEncryptedDataTlv
 
+  /** Amount to forward to the next node. */
+  case class AmountToForward(amount: MilliSatoshi) extends RouteBlindingEncryptedDataTlv
+
+  /** CLTV value to use for the HTLC offered to the next node. */
+  case class OutgoingCltv(cltv: CltvExpiry) extends RouteBlindingEncryptedDataTlv
 }
 
 object RouteBlindingEncryptedDataCodecs {
@@ -66,6 +72,9 @@ object RouteBlindingEncryptedDataCodecs {
   private val outgoingNodeId: Codec[OutgoingNodeId] = (("length" | constant(hex"21")) :: ("node_id" | publicKey)).as[OutgoingNodeId]
   private val pathId: Codec[PathId] = variableSizeBytesLong(varintoverflow, "path_id" | bytes).as[PathId]
   private val nextBlinding: Codec[NextBlinding] = (("length" | constant(hex"21")) :: ("blinding" | publicKey)).as[NextBlinding]
+  private val amountToForward: Codec[AmountToForward] = ("amount_msat" | ltmillisatoshi).as[AmountToForward]
+  private val outgoingCltv: Codec[OutgoingCltv] = ("cltv" | ltu32).xmap(cltv => OutgoingCltv(CltvExpiry(cltv)), (c: OutgoingCltv) => c.cltv.toLong)
+
 
   private val encryptedDataTlvCodec = discriminated[RouteBlindingEncryptedDataTlv].by(varint)
     .typecase(UInt64(1), padding)
@@ -73,6 +82,8 @@ object RouteBlindingEncryptedDataCodecs {
     .typecase(UInt64(4), outgoingNodeId)
     .typecase(UInt64(6), pathId)
     .typecase(UInt64(8), nextBlinding)
+    .typecase(UInt64(10), amountToForward)
+    .typecase(UInt64(12), outgoingCltv)
 
   val encryptedDataCodec: Codec[TlvStream[RouteBlindingEncryptedDataTlv]] = TlvCodecs.tlvStream[RouteBlindingEncryptedDataTlv](encryptedDataTlvCodec).complete
 

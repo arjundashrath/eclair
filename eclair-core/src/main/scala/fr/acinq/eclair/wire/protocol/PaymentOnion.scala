@@ -254,8 +254,8 @@ object PaymentOnion {
   case class RelayLegacyPayload(outgoingChannelId: ShortChannelId, amountToForward: MilliSatoshi, outgoingCltv: CltvExpiry) extends ChannelRelayPayload with LegacyFormat
 
   case class ChannelRelayTlvPayload(records: TlvStream[OnionPaymentPayloadTlv], blinded: Option[TlvStream[RouteBlindingEncryptedDataTlv]]) extends ChannelRelayPayload with TlvFormat {
-    override val amountToForward = records.get[AmountToForward].get.amount
-    override val outgoingCltv = records.get[OutgoingCltv].get.cltv
+    override val amountToForward = blinded.map(_.get[RouteBlindingEncryptedDataTlv.AmountToForward].get.amount).getOrElse(records.get[AmountToForward].get.amount)
+    override val outgoingCltv = blinded.map(_.get[RouteBlindingEncryptedDataTlv.OutgoingCltv].get.cltv).getOrElse(records.get[OutgoingCltv].get.cltv)
     override val outgoingChannelId = blinded.map(_.get[RouteBlindingEncryptedDataTlv.OutgoingChannelId].get.shortChannelId).getOrElse(records.get[OutgoingChannelId].get.shortChannelId)
   }
 
